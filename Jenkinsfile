@@ -13,7 +13,7 @@ pipeline {
     environment {
         PROJECT = "team2"
         IMAGE_NAME = "${PROJECT}-springboot-app"
-        APP_PORT = "8085" // internal port inside container
+        APP_PORT = "8085"
     }
 
     stages {
@@ -23,14 +23,14 @@ pipeline {
                 script {
                     if (params.ENVIRONMENT == 'prod') {
                         env.CONTAINER_NAME = "${PROJECT}-springboot-prod"
-                        env.HOST_PORT = "8088"  // unique port for team2 prod
+                        env.HOST_PORT = "8088"
                         env.DB_HOST = "team_2_prod_postgres"
                         env.DB_NAME = "team_2_prod_db"
                         env.DB_PORT = "5443"
                         CRED_ID = "team2_prod_credentials"
                     } else {
                         env.CONTAINER_NAME = "${PROJECT}-springboot-dev"
-                        env.HOST_PORT = "8087"  // unique port for team2 dev
+                        env.HOST_PORT = "8087"
                         env.DB_HOST = "team_2_dev_postgres"
                         env.DB_NAME = "team_2_db"
                         env.DB_PORT = "5433"
@@ -57,24 +57,20 @@ pipeline {
             steps {
                 echo "⚙️ Building Spring Boot JAR..."
                 sh 'mvn clean package -DskipTests'
+                echo "✅ JAR built successfully"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    def TAG = "${params.ENVIRONMENT}-${BUILD_NUMBER}"
-                    echo "🐳 Building Docker image: ${IMAGE_NAME}:${TAG}"
-                    sh """
-                        docker build -t ${IMAGE_NAME}:${TAG} -t ${IMAGE_NAME}:${params.ENVIRONMENT} .
-                    """
-                }
+                echo "🐳 Building Docker image..."
+                sh "docker build -t ${IMAGE_NAME}:${params.ENVIRONMENT} ."
             }
         }
 
         stage('Stop Previous Container') {
             steps {
-                echo "🛑 Stopping old container (if any)..."
+                echo "🛑 Stopping old container..."
                 sh """
                     docker stop ${CONTAINER_NAME} || true
                     docker rm ${CONTAINER_NAME} || true
@@ -85,26 +81,22 @@ pipeline {
         stage('Run New Container') {
             steps {
                 script {
-                    withCredentials([
-                        usernamePassword(credentialsId: CRED_ID,
-                                         usernameVariable: 'DB_USER',
-                                         passwordVariable: 'DB_PASS')
-                    ]) {
+                    withCredentials([usernamePassword(credentialsId: CRED_ID,
+                                                      usernameVariable: 'DB_USER',
+                                                      passwordVariable: 'DB_PASS')]) {
 
-                        echo "🚀 Deploying ${params.ENVIRONMENT} container..."
+                        echo "🚀 Deploying new ${params.ENVIRONMENT} container..."
 
                         sh """
-                            # Free host port if used
                             if docker ps --format '{{.Ports}}' | grep -q ':${HOST_PORT}->'; then
-                              echo "⚠️ Port ${HOST_PORT} in use. Stopping container using it..."
-                              docker ps --format '{{.ID}} {{.Ports}}' | grep ':${HOST_PORT}->' | awk '{print \$1}' | xargs -r docker stop
+                              echo '⚠️ Port ${HOST_PORT} in use. Stopping...'
+                              docker ps --format '{{.ID}} {{.Ports}}' | grep ':${HOST_PORT}->' | awk '{print \\\\$1}' | xargs -r docker stop
                             fi
 
                             docker run -d \
                               --name ${CONTAINER_NAME} \
                               --network jenkins-net \
                               -p ${HOST_PORT}:${APP_PORT} \
-                              --memory="1g" --cpus="1.0" \
                               -e SPRING_PROFILES_ACTIVE=${params.ENVIRONMENT} \
                               -e SPRING_DATASOURCE_URL=${DB_URL} \
                               -e SPRING_DATASOURCE_USERNAME=$DB_USER \
@@ -121,7 +113,6 @@ pipeline {
             steps {
                 echo "🕒 Waiting for app startup..."
                 sh 'sleep 20'
-
                 echo "🔍 Checking container health..."
                 sh """
                     docker ps | grep ${CONTAINER_NAME} || (echo '❌ Container not running!' && exit 1)
