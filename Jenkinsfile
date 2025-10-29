@@ -19,34 +19,31 @@ pipeline {
     stages {
 
         stage('Initialize Environment Variables') {
-          steps {
-            script {
-              if (params.ENVIRONMENT == 'prod') {
-                env.CONTAINER_NAME = "${PROJECT}-springboot-prod"
-                env.HOST_PORT = "8088"                      // host port mapping
-                env.DB_HOST = "team_2_prod_postgres"
-                env.DB_NAME = "team_2_prod_db"
-                // host->container mapping port (host side) - NOT used in DB_URL
-                env.DB_HOST_PORT_ON_HOST = "5443"
-                env.CRED_ID = "team2_prod_credentials"
-              } else {
-                env.CONTAINER_NAME = "${PROJECT}-springboot-dev"
-                env.HOST_PORT = "8087"
-                env.DB_HOST = "team_2_dev_postgres"
-                env.DB_NAME = "team_2_db"
-                env.DB_HOST_PORT_ON_HOST = "5433"
-                env.CRED_ID = "team2_dev_credentials"
-              }
+            steps {
+                script {
+                    if (params.ENVIRONMENT == 'prod') {
+                        env.CONTAINER_NAME = "${PROJECT}-springboot-prod"
+                        env.HOST_PORT = "8088"
+                        env.DB_HOST = "team_2_prod_postgres"
+                        env.DB_NAME = "team_2_prod_db"
+                        env.DB_PORT = "5443"
+                        CRED_ID = "team2_prod_credentials"
+                    } else {
+                        env.CONTAINER_NAME = "${PROJECT}-springboot-dev"
+                        env.HOST_PORT = "8087"
+                        env.DB_HOST = "team_2_dev_postgres"
+                        env.DB_NAME = "team_2_db"
+                        env.DB_PORT = "5433"
+                        CRED_ID = "team2_dev_credentials"
+                    }
 
-              // IMPORTANT: use container internal DB port 5432 in DB_URL (not the host mapped port)
-              env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
+                    env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}"
 
-              // tag with build number to avoid overwriting
-              env.IMAGE_TAG = "${IMAGE_NAME}:${params.ENVIRONMENT}-${env.BUILD_NUMBER}"
-
-              echo "ENV=${params.ENVIRONMENT} CONTAINER=${env.CONTAINER_NAME} DB_URL=${env.DB_URL} IMAGE=${env.IMAGE_TAG}"
+                    echo "🌍 Environment: ${params.ENVIRONMENT}"
+                    echo "📦 Container: ${env.CONTAINER_NAME}"
+                    echo "🗄 Database: ${env.DB_URL}"
+                }
             }
-          }
         }
 
         stage('Checkout Code') {
