@@ -1,28 +1,28 @@
-# Type 2: Build Inside Container Approach
-# This Dockerfile packages the app + Java together
+# ===============================
+# Dockerfile for team2project
+# ===============================
 
-# Use base image with Java 21
+# Use lightweight JDK 21 base image
 FROM openjdk:21-jdk-slim
 
-# Install curl for health checks (needed for Jenkins verification)
+# Install curl for health check support
 RUN apt-get update -qq && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy the jar file (built by Jenkins or Maven)
+# Copy Spring Boot jar file (built by Maven in Jenkins)
 COPY target/team2project-0.0.1-SNAPSHOT.jar app.jar
 
-# Expose port
+# Expose internal Spring Boot port
 EXPOSE 8085
 
-# Set timezone
-ENV TZ=UTC
+# Set timezone for consistency
+ENV TZ=Asia/Kolkata
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8085/actuator/health || exit 1
+# Default environment variables (can be overridden by Jenkins)
+ENV SPRING_PROFILES_ACTIVE=dev \
+    SERVER_PORT=8085
 
-# Run the jar
+# Run the app
 ENTRYPOINT ["java", "-jar", "app.jar"]
-
