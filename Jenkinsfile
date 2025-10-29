@@ -90,7 +90,7 @@ pipeline {
                         sh """
                             if docker ps --format '{{.Ports}}' | grep -q ':${HOST_PORT}->'; then
                               echo '⚠️ Port ${HOST_PORT} in use. Stopping...'
-                              docker ps --format '{{.ID}} {{.Ports}}' | grep ':${HOST_PORT}->' | awk '{print \\\\$1}' | xargs -r docker stop
+                              docker ps --format '{{.ID}} {{.Ports}}' | grep ':${HOST_PORT}->' | awk '{print \$1}' | xargs -r docker stop
                             fi
 
                             docker run -d \
