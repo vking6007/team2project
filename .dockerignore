@@ -1,0 +1,25 @@
+# Maven / build
+/target
+/.mvn
+
+# Git
+/.git
+.gitignore
+
+# IDE
+/.idea
+*.iml
+*.ipr
+*.iws
+/.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/logs
+
+# Misc
+/node_modules
