@@ -110,12 +110,26 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 echo "🕒 Waiting for app startup..."
-                sh 'sleep 20'
-                echo "🔍 Checking container health..."
+                sh 'sleep 10'
+
+                echo "🔍 Checking container health from inside the container..."
                 sh """
-                    docker ps | grep ${CONTAINER_NAME} || (echo '❌ Container not running!' && exit 1)
-                    curl -fsS http://168.220.248.40:${HOST_PORT}/actuator/health \
-                    || (echo '⚠️ Health check failed!' && exit 1)
+                    RETRIES=12
+                    COUNT=0
+                    until [ \$COUNT -ge \$RETRIES ]
+                    do
+                      echo "Attempt \$((COUNT+1)) of \$RETRIES..."
+                      if docker exec ${CONTAINER_NAME} curl -fsS http://localhost:${APP_PORT}/actuator/health > /dev/null 2>&1; then
+                        echo "✅ Health check passed inside container."
+                        exit 0
+                      fi
+                      COUNT=\$((COUNT+1))
+                      sleep 5
+                    done
+
+                    echo "❌ Health check failed after \$RETRIES attempts. Showing container logs:"
+                    docker logs ${CONTAINER_NAME} --tail 300 || true
+                    exit 1
                 """
             }
         }
