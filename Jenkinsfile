@@ -22,20 +22,20 @@ pipeline {
             steps {
                 script {
                     if (params.ENVIRONMENT == 'prod') {
-                        env.CONTAINER_NAME = "springboot-app-prod"
-                        env.HOST_PORT = "8086"
-                        env.DB_HOST = "team_1_prod_postgres"
-                        env.DB_NAME = "team_1_prod_db"
-                        CRED_ID = "team1_prod_credentials"
+                        env.CONTAINER_NAME = "${PROJECT}-springboot-prod"
+                        env.HOST_PORT = "8088"
+                        env.DB_HOST = "team_2_prod_postgres"
+                        env.DB_NAME = "team_2_prod_db"
+                        CRED_ID = "team2_prod_credentials"
                     } else {
-                        env.CONTAINER_NAME = "springboot-app-dev"
-                        env.HOST_PORT = "8082"
-                        env.DB_HOST = "team_1_dev_1_postgres"
-                        env.DB_NAME = "team_1_db"
-                        CRED_ID = "team1_dev_credentials"
+                        env.CONTAINER_NAME = "${PROJECT}-springboot-dev"
+                        env.HOST_PORT = "8087"
+                        env.DB_HOST = "team_2_dev_postgres"
+                        env.DB_NAME = "team_2_db"
+                        CRED_ID = "team2_dev_credentials"
                     }
 
-                    env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
+                     env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
 
                     echo "🌍 Environment: ${params.ENVIRONMENT}"
                     echo "📦 Container: ${env.CONTAINER_NAME}"
@@ -114,7 +114,7 @@ pipeline {
                 echo "🔍 Checking container health..."
                 sh """
                     docker ps | grep ${CONTAINER_NAME} || (echo '❌ Container not running!' && exit 1)
-                    curl -fsS http://localhost:${HOST_PORT}/actuator/health \
+                    curl -fsS http://http://168.220.248.40:${HOST_PORT}/actuator/health \
                     || (echo '⚠️ Health check failed!' && exit 1)
                 """
             }
@@ -124,7 +124,7 @@ pipeline {
     post {
         success {
             echo "🎉 ${params.ENVIRONMENT.toUpperCase()} Deployment Successful!"
-            echo "🌍 App running at: http://localhost:${HOST_PORT}"
+            echo "🌍 App running at: http://168.220.248.40:${HOST_PORT}"
         }
         failure {
             echo "❌ ${params.ENVIRONMENT.toUpperCase()} Deployment Failed!"
