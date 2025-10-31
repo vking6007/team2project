@@ -114,7 +114,7 @@ pipeline {
                 echo "🔍 Checking container health..."
                 sh """
                     docker ps | grep ${CONTAINER_NAME} || (echo '❌ Container not running!' && exit 1)
-                    curl -fsS http://http://168.220.248.40:${HOST_PORT}/actuator/health \
+                    curl -fsS http://168.220.248.40:${HOST_PORT}/actuator/health \
                     || (echo '⚠️ Health check failed!' && exit 1)
                 """
             }
