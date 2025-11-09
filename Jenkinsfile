@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'prod'], description: 'Select target deployment environment')
+        choice(name: 'ENVIRONMENT', choices: ['none', 'dev', 'prod'], description: 'Select target environment for deployment (none = build only)')
     }
 
     environment {
@@ -29,36 +29,36 @@ pipeline {
         }
 
         stage('Initialize Environment Variables') {
-      steps {
-        script {
-            env.SAFE_BRANCH = env.BRANCH_NAME.replaceAll('/', '-')
-            env.IMAGE_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-app"
-            env.CONTAINER_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-${params.ENVIRONMENT}"
-            env.HOST_PORT = (params.ENVIRONMENT == 'prod') ? "8088" : "8087"
+            steps {
+                script {
+                    env.SAFE_BRANCH = env.BRANCH_NAME.replaceAll('/', '-')
+                    env.IMAGE_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-app"
+                    env.CONTAINER_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-${params.ENVIRONMENT}"
 
-            if (params.ENVIRONMENT == 'prod') {
-                env.DB_HOST = "team_2_prod_postgres"
-                env.DB_NAME = "team_2_prod_db"
-                CRED_ID = "team2_prod_credentials"
-            } else {
-                env.DB_HOST = "team_2_dev_postgres"
-                env.DB_NAME = "team_2_db"
-                CRED_ID = "team2_dev_credentials"
+                    // Set host port based on environment
+                    if (params.ENVIRONMENT == 'prod') {
+                        env.HOST_PORT = "8088"
+                        env.DB_HOST = "team_2_prod_postgres"
+                        env.DB_NAME = "team_2_prod_db"
+                        CRED_ID = "team2_prod_credentials"
+                    } else {
+                        env.HOST_PORT = "8087"
+                        env.DB_HOST = "team_2_dev_postgres"
+                        env.DB_NAME = "team_2_db"
+                        CRED_ID = "team2_dev_credentials"
+                    }
+
+                    env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
+
+                    echo """
+                    🌿 Branch: ${env.BRANCH_NAME}
+                    📦 Image: ${IMAGE_NAME}
+                    🌍 Selected Environment: ${params.ENVIRONMENT}
+                    🗄 DB_URL: ${env.DB_URL}
+                    """
+                }
             }
-
-            env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
-
-            echo """
-            🌍 Environment: ${params.ENVIRONMENT}
-            🌿 Branch: ${env.BRANCH_NAME}
-            📦 Safe Branch: ${env.SAFE_BRANCH}
-            🧱 Container: ${env.CONTAINER_NAME}
-            🗄 DB_URL: ${env.DB_URL}
-            """
         }
-    }
-}
-
 
         stage('Build JAR') {
             steps {
@@ -71,11 +71,23 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Building Docker image..."
-                sh "docker build -t ${IMAGE_NAME}:${params.ENVIRONMENT} ."
+                sh "docker build -t ${IMAGE_NAME}:${params.ENVIRONMENT == 'none' ? 'build' : params.ENVIRONMENT} ."
+                echo "✅ Docker image built successfully"
             }
         }
 
+        stage('Archive Build Artifacts') {
+            steps {
+                echo "🗂 Archiving JAR..."
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+
+        // Only deploy when user selected a real environment (dev/prod)
         stage('Stop Previous Container') {
+            when {
+                expression { return params.ENVIRONMENT != 'none' }
+            }
             steps {
                 echo "🛑 Stopping old container if running..."
                 sh """
@@ -86,13 +98,16 @@ pipeline {
         }
 
         stage('Run New Container') {
+            when {
+                expression { return params.ENVIRONMENT != 'none' }
+            }
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: CRED_ID,
                                                       usernameVariable: 'DB_USER',
                                                       passwordVariable: 'DB_PASS')]) {
 
-                        echo "🚀 Deploying ${env.BRANCH_NAME} branch to ${params.ENVIRONMENT} environment..."
+                        echo "🚀 Deploying ${env.BRANCH_NAME} branch to ${params.ENVIRONMENT}..."
 
                         sh """
                             if docker ps --format '{{.Ports}}' | grep -q ':${HOST_PORT}->'; then
@@ -117,6 +132,9 @@ pipeline {
         }
 
         stage('Verify Deployment') {
+            when {
+                expression { return params.ENVIRONMENT != 'none' }
+            }
             steps {
                 echo "🕒 Waiting for app startup..."
                 sh 'sleep 10'
@@ -129,32 +147,46 @@ pipeline {
                     do
                       echo "Attempt \$((COUNT+1)) of \$RETRIES..."
                       if docker exec ${CONTAINER_NAME} curl -fsS http://localhost:${APP_PORT}/actuator/health > /dev/null 2>&1; then
-                        echo "✅ Health check passed inside container."
+                        echo "✅ Health check passed!"
                         exit 0
                       fi
                       COUNT=\$((COUNT+1))
                       sleep 5
                     done
 
-                    echo "❌ Health check failed after \$RETRIES attempts. Showing container logs:"
+                    echo "❌ Health check failed after \$RETRIES attempts."
                     docker logs ${CONTAINER_NAME} --tail 300 || true
                     exit 1
                 """
+            }
+        }
+
+        stage('Summary') {
+            steps {
+                script {
+                    if (params.ENVIRONMENT == 'none') {
+                        echo """
+                        ✅ Build-only mode completed for branch '${env.BRANCH_NAME}'.
+                        🔹 Docker image: ${IMAGE_NAME}:build
+                        🔹 No container deployed automatically.
+                        """
+                    } else {
+                        echo """
+                        ✅ Deployment completed for '${env.BRANCH_NAME}' → ${params.ENVIRONMENT}.
+                        🌍 URL: http://168.220.248.40:${HOST_PORT}
+                        """
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo "🎉 Successfully deployed branch '${env.BRANCH_NAME}' to ${params.ENVIRONMENT}!"
-            echo "🌍 URL: http://168.220.248.40:${HOST_PORT}"
+            echo "🎉 Pipeline finished successfully for ${env.BRANCH_NAME} (${params.ENVIRONMENT})"
         }
         failure {
-            echo "❌ Deployment failed for branch '${env.BRANCH_NAME}' (${params.ENVIRONMENT})"
-            sh 'docker logs ${CONTAINER_NAME} || true'
-        }
-        always {
-            echo "✅ Jenkins Pipeline finished for ${env.BRANCH_NAME} → ${params.ENVIRONMENT}"
+            echo "❌ Pipeline failed for ${env.BRANCH_NAME} (${params.ENVIRONMENT})"
         }
     }
 }
