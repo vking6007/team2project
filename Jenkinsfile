@@ -6,6 +6,7 @@ pipeline {
         maven 'Maven_3.9.6'
     }
 
+
     parameters {
         choice(name: 'ENVIRONMENT', choices: ['none', 'dev', 'prod'], description: 'Select target environment for deployment (none = build only)')
     }
