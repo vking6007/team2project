@@ -29,35 +29,36 @@ pipeline {
         }
 
         stage('Initialize Environment Variables') {
-            steps {
-                script {
-                    // Environment & Branch based naming
-                    env.IMAGE_NAME = "${PROJECT}-${env.BRANCH_NAME}-springboot-app"
-                    env.CONTAINER_NAME = "${PROJECT}-${env.BRANCH_NAME}-springboot-${params.ENVIRONMENT}"
-                    env.HOST_PORT = (params.ENVIRONMENT == 'prod') ? "8088" : "8087"
+      steps {
+        script {
+            env.SAFE_BRANCH = env.BRANCH_NAME.replaceAll('/', '-')
+            env.IMAGE_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-app"
+            env.CONTAINER_NAME = "${PROJECT}-${env.SAFE_BRANCH}-springboot-${params.ENVIRONMENT}"
+            env.HOST_PORT = (params.ENVIRONMENT == 'prod') ? "8088" : "8087"
 
-                    if (params.ENVIRONMENT == 'prod') {
-                        env.DB_HOST = "team_2_prod_postgres"
-                        env.DB_NAME = "team_2_prod_db"
-                        CRED_ID = "team2_prod_credentials"
-                    } else {
-                        env.DB_HOST = "team_2_dev_postgres"
-                        env.DB_NAME = "team_2_db"
-                        CRED_ID = "team2_dev_credentials"
-                    }
-
-                    env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
-
-                    echo """
-                    🌍 Environment: ${params.ENVIRONMENT}
-                    🌿 Branch: ${env.BRANCH_NAME}
-                    📦 Image: ${env.IMAGE_NAME}
-                    🧱 Container: ${env.CONTAINER_NAME}
-                    🗄 DB_URL: ${env.DB_URL}
-                    """
-                }
+            if (params.ENVIRONMENT == 'prod') {
+                env.DB_HOST = "team_2_prod_postgres"
+                env.DB_NAME = "team_2_prod_db"
+                CRED_ID = "team2_prod_credentials"
+            } else {
+                env.DB_HOST = "team_2_dev_postgres"
+                env.DB_NAME = "team_2_db"
+                CRED_ID = "team2_dev_credentials"
             }
+
+            env.DB_URL = "jdbc:postgresql://${env.DB_HOST}:5432/${env.DB_NAME}"
+
+            echo """
+            🌍 Environment: ${params.ENVIRONMENT}
+            🌿 Branch: ${env.BRANCH_NAME}
+            📦 Safe Branch: ${env.SAFE_BRANCH}
+            🧱 Container: ${env.CONTAINER_NAME}
+            🗄 DB_URL: ${env.DB_URL}
+            """
         }
+    }
+}
+
 
         stage('Build JAR') {
             steps {
